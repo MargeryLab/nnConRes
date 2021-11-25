@@ -15,7 +15,7 @@
 
 from nnunet.training.network_training.nnUNetTrainerV2 import nnUNetTrainerV2
 from nnunet.training.loss_functions.dice_loss import MCCLoss
-from nnunet.utilities.nd_softmax import softmax_helper
+from nnunet.utilities.nd_softmax import sigmoid_helper
 
 
 class nnUNetTrainerV2_Loss_MCC(nnUNetTrainerV2):
@@ -24,7 +24,7 @@ class nnUNetTrainerV2_Loss_MCC(nnUNetTrainerV2):
         super().__init__(plans_file, fold, output_folder, dataset_directory, batch_dice, stage, unpack_data,
                          deterministic, fp16)
         self.initial_lr = 1e-3
-        self.loss = MCCLoss(apply_nonlin=softmax_helper, batch_mcc=self.batch_dice, do_bg=True, smooth=0.0)
+        self.loss = MCCLoss(apply_nonlin=sigmoid_helper, batch_mcc=self.batch_dice, do_bg=True, smooth=0.0)
 
 
 class nnUNetTrainerV2_Loss_MCCnoBG(nnUNetTrainerV2):
@@ -33,5 +33,5 @@ class nnUNetTrainerV2_Loss_MCCnoBG(nnUNetTrainerV2):
         super().__init__(plans_file, fold, output_folder, dataset_directory, batch_dice, stage, unpack_data,
                          deterministic, fp16)
         self.initial_lr = 1e-3
-        self.loss = MCCLoss(apply_nonlin=softmax_helper, batch_mcc=self.batch_dice, do_bg=False, smooth=0.0)
+        self.loss = MCCLoss(apply_nonlin=sigmoid_helper, batch_mcc=self.batch_dice, do_bg=False, smooth=0.0)
 

@@ -48,14 +48,14 @@ class ExperimentPlanner3D_v21(ExperimentPlanner):
         spacings = self.dataset_properties['all_spacings']
         sizes = self.dataset_properties['all_sizes']
 
-        target = np.percentile(np.vstack(spacings), self.target_spacing_percentile, 0)
+        target = np.percentile(np.vstack(spacings), self.target_spacing_percentile, 0)#纵列上求排序之后的中位数 [3.30000114 0.3125 0.3125    ]
 
         # This should be used to determine the new median shape. The old implementation is not 100% correct.
         # Fixed in 2.4
         # sizes = [np.array(i) / target * np.array(j) for i, j in zip(spacings, sizes)]
 
-        target_size = np.percentile(np.vstack(sizes), self.target_spacing_percentile, 0)
-        target_size_mm = np.array(target) * np.array(target_size)
+        target_size = np.percentile(np.vstack(sizes), self.target_spacing_percentile, 0)#[ 24. 512. 512.]
+        target_size_mm = np.array(target) * np.array(target_size)#[ 79.20002747 160.  160. ]
         # we need to identify datasets for which a different target spacing could be beneficial. These datasets have
         # the following properties:
         # - one axis which much lower resolution than the others

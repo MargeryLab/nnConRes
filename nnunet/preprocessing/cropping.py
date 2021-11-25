@@ -32,7 +32,7 @@ def create_nonzero_mask(data):
 
 
 def get_bbox_from_mask(mask, outside_value=0):
-    mask_voxel_coords = np.where(mask != outside_value)
+    mask_voxel_coords = np.where(mask != outside_value)#输出满足条件 (即非0) 元素的坐标 (等价于numpy.nonzero)。这里的坐标以tuple的形式给出，通常原数组有多少维，输出的tuple中就包含几个数组，分别对应符合条件元素的各维坐标。
     minzidx = int(np.min(mask_voxel_coords[0]))
     maxzidx = int(np.max(mask_voxel_coords[0])) + 1
     minxidx = int(np.min(mask_voxel_coords[1]))
@@ -72,7 +72,7 @@ def load_case_from_list_of_files(data_files, seg_file=None):
     properties["itk_spacing"] = data_itk[0].GetSpacing()
     properties["itk_direction"] = data_itk[0].GetDirection()
 
-    data_npy = np.vstack([sitk.GetArrayFromImage(d)[None] for d in data_itk])
+    data_npy = np.vstack([sitk.GetArrayFromImage(d)[None] for d in data_itk])#(1, 24, 512, 512)
     if seg_file is not None:
         seg_itk = sitk.ReadImage(seg_file)
         seg_npy = sitk.GetArrayFromImage(seg_itk)[None].astype(np.float32)
@@ -89,7 +89,7 @@ def crop_to_nonzero(data, seg=None, nonzero_label=-1):
     :param nonzero_label: this will be written into the segmentation map
     :return:
     """
-    nonzero_mask = create_nonzero_mask(data)
+    nonzero_mask = create_nonzero_mask(data)#(24, 512, 512)
     bbox = get_bbox_from_mask(nonzero_mask, 0)
 
     cropped_data = []
@@ -101,11 +101,11 @@ def crop_to_nonzero(data, seg=None, nonzero_label=-1):
     if seg is not None:
         cropped_seg = []
         for c in range(seg.shape[0]):
-            cropped = crop_to_bbox(seg[c], bbox)
+            cropped = crop_to_bbox(seg[c], bbox)#(24, 512, 512)
             cropped_seg.append(cropped[None])
         seg = np.vstack(cropped_seg)
 
-    nonzero_mask = crop_to_bbox(nonzero_mask, bbox)[None]
+    nonzero_mask = crop_to_bbox(nonzero_mask, bbox)[None]#(1, 24, 512, 512)
     if seg is not None:
         seg[(seg == 0) & (nonzero_mask == 0)] = nonzero_label
     else:
@@ -137,7 +137,7 @@ class ImageCropper(object):
 
     @staticmethod
     def crop(data, properties, seg=None):
-        shape_before = data.shape
+        shape_before = data.shape   #(1, 24, 512, 512)
         data, seg, bbox = crop_to_nonzero(data, seg, nonzero_label=-1)
         shape_after = data.shape
         print("before crop:", shape_before, "after crop:", shape_after, "spacing:",

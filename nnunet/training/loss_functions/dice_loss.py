@@ -16,7 +16,7 @@
 import torch
 from nnunet.training.loss_functions.TopK_loss import TopKLoss
 from nnunet.training.loss_functions.crossentropy import RobustCrossEntropyLoss
-from nnunet.utilities.nd_softmax import softmax_helper
+from nnunet.utilities.nd_softmax import sigmoid_helper
 from nnunet.utilities.tensor_utilities import sum_tensor
 from torch import nn
 import numpy as np
@@ -326,9 +326,9 @@ class DC_and_CE_loss(nn.Module):
         self.ignore_label = ignore_label
 
         if not square_dice:
-            self.dc = SoftDiceLoss(apply_nonlin=softmax_helper, **soft_dice_kwargs)
+            self.dc = SoftDiceLoss(apply_nonlin=sigmoid_helper, **soft_dice_kwargs)
         else:
-            self.dc = SoftDiceLossSquared(apply_nonlin=softmax_helper, **soft_dice_kwargs)
+            self.dc = SoftDiceLossSquared(apply_nonlin=sigmoid_helper, **soft_dice_kwargs)
 
     def forward(self, net_output, target):
         """
@@ -394,7 +394,7 @@ class GDL_and_CE_loss(nn.Module):
         super(GDL_and_CE_loss, self).__init__()
         self.aggregate = aggregate
         self.ce = RobustCrossEntropyLoss(**ce_kwargs)
-        self.dc = GDL(softmax_helper, **gdl_dice_kwargs)
+        self.dc = GDL(sigmoid_helper, **gdl_dice_kwargs)
 
     def forward(self, net_output, target):
         dc_loss = self.dc(net_output, target)
@@ -412,9 +412,9 @@ class DC_and_topk_loss(nn.Module):
         self.aggregate = aggregate
         self.ce = TopKLoss(**ce_kwargs)
         if not square_dice:
-            self.dc = SoftDiceLoss(apply_nonlin=softmax_helper, **soft_dice_kwargs)
+            self.dc = SoftDiceLoss(apply_nonlin=sigmoid_helper, **soft_dice_kwargs)
         else:
-            self.dc = SoftDiceLossSquared(apply_nonlin=softmax_helper, **soft_dice_kwargs)
+            self.dc = SoftDiceLossSquared(apply_nonlin=sigmoid_helper, **soft_dice_kwargs)
 
     def forward(self, net_output, target):
         dc_loss = self.dc(net_output, target)

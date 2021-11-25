@@ -19,21 +19,23 @@ from typing import Tuple
 import numpy as np
 import torch
 from nnunet.training.data_augmentation.data_augmentation_moreDA import get_moreDA_augmentation
-from nnunet.training.loss_functions.deep_supervision import MultipleOutputLoss2
+from nnunet.training.loss_functions.deep_supervision import MultipleOutputLoss2, DiceLoss4BraTS, BCELoss4BraTS, BCELossBoud
 from nnunet.utilities.to_torch import maybe_to_torch, to_cuda
-from nnunet.network_architecture.generic_UNet import Generic_UNet
+from nnunet.network_architecture.generic_ConResAtt import conresnet
 from nnunet.network_architecture.initialization import InitWeights_He
 from nnunet.network_architecture.neural_network import SegmentationNetwork
 from nnunet.training.data_augmentation.default_data_augmentation import default_2D_augmentation_params, \
     get_patch_size, default_3D_augmentation_params
 from nnunet.training.dataloading.dataset_loading import unpack_dataset
 from nnunet.training.network_training.nnUNetTrainer import nnUNetTrainer
-from nnunet.utilities.nd_softmax import softmax_helper
+from nnunet.utilities.nd_softmax import sigmoid_helper
 from sklearn.model_selection import KFold
 from torch import nn
 from torch.cuda.amp import autocast
+import torch.nn.functional as F
 from nnunet.training.learning_rate.poly_lr import poly_lr
 from batchgenerators.utilities.file_and_folder_operations import *
+from nnunet.utilities.id2trainId import id2trainId
 
 
 class nnUNetTrainerV2(nnUNetTrainer):
@@ -151,15 +153,17 @@ class nnUNetTrainerV2(nnUNetTrainer):
         dropout_op_kwargs = {'p': 0, 'inplace': True}
         net_nonlin = nn.LeakyReLU
         net_nonlin_kwargs = {'negative_slope': 1e-2, 'inplace': True}
-        self.network = Generic_UNet(self.num_input_channels, self.base_num_features, self.num_classes,
-                                    len(self.net_num_pool_op_kernel_sizes),
-                                    self.conv_per_stage, 2, conv_op, norm_op, norm_op_kwargs, dropout_op,
-                                    dropout_op_kwargs,
-                                    net_nonlin, net_nonlin_kwargs, True, False, lambda x: x, InitWeights_He(1e-2),
-                                    self.net_num_pool_op_kernel_sizes, self.net_conv_kernel_sizes, False, True, True)
+        # self.network = Generic_UNet(self.num_input_channels, self.base_num_features, self.num_classes,
+        #                             len(self.net_num_pool_op_kernel_sizes),
+        #                             self.conv_per_stage, 2, conv_op, norm_op, norm_op_kwargs, dropout_op,
+        #                             dropout_op_kwargs,
+        #                             net_nonlin, net_nonlin_kwargs, True, False, lambda x: x, InitWeights_He(1e-2),
+        #                             self.net_num_pool_op_kernel_sizes, self.net_conv_kernel_sizes, False, True, True)
+        self.network = conresnet(self.basic_generator_patch_size, conv_op, norm_op, norm_op_kwargs, num_classes=self.num_classes)
+
         if torch.cuda.is_available():
             self.network.cuda()
-        self.network.inference_apply_nonlin = softmax_helper
+        self.network.inference_apply_nonlin = sigmoid_helper
 
     def initialize_optimizer_and_scheduler(self):
         assert self.network is not None, "self.initialize_network must be called first"
@@ -257,7 +261,26 @@ class nnUNetTrainerV2(nnUNetTrainer):
         else:
             output = self.network(data)
             del data
-            l = self.loss(output, target)
+            label = target[0]
+            label = id2trainId(label)
+            bs, _, dep, hei, wei = label.shape
+            label_copy = torch.zeros((bs, _, dep, hei, wei), dtype=torch.float32, device='cuda')
+            label_copy[:, :, 1:, :, :] = label[:, :, 0:dep - 1, :, :]
+            label_res = label - label_copy
+            label_res[torch.where(label_res == 0)] = 0
+            label_res[torch.where(label_res != 0)] = 1
+            # term_seg = self.loss(output, target)
+            loss_D = DiceLoss4BraTS().to('cuda')  # DiceLoss
+            loss_BCE = BCELoss4BraTS().to('cuda')  # BCE
+            loss_B = BCELossBoud().to('cuda')
+
+            term_seg_Dice = loss_D.forward(output[0], label)
+            term_seg_BCE = loss_BCE.forward(output[0], label)
+            term_res_BCE = loss_B.forward(output[1], label_res)
+            term_resx2_BCE = loss_B.forward(output[2], label_res)
+            term_resx4_BCE = loss_B.forward(output[3], label_res)
+
+            l = term_seg_Dice + term_seg_BCE + term_res_BCE + 0.5 * (term_resx2_BCE +term_resx4_BCE)
 
             if do_backprop:
                 l.backward()
@@ -369,13 +392,13 @@ class nnUNetTrainerV2(nnUNetTrainer):
         self.data_aug_params["mask_was_used_for_normalization"] = self.use_mask_for_norm
 
         if self.do_dummy_2D_aug:
-            self.basic_generator_patch_size = get_patch_size(self.patch_size[1:],
+            self.basic_generator_patch_size = get_patch_size(self.patch_size[1:],#[ 16 320 320]
                                                              self.data_aug_params['rotation_x'],
                                                              self.data_aug_params['rotation_y'],
                                                              self.data_aug_params['rotation_z'],
                                                              self.data_aug_params['scale_range'])
-            self.basic_generator_patch_size = np.array([self.patch_size[0]] + list(self.basic_generator_patch_size))
-            patch_size_for_spatialtransform = self.patch_size[1:]
+            self.basic_generator_patch_size = np.array([self.patch_size[0]] + list(self.basic_generator_patch_size))#[ 16 376 376]
+            patch_size_for_spatialtransform = self.patch_size[1:]#[320 320]
         else:
             self.basic_generator_patch_size = get_patch_size(self.patch_size, self.data_aug_params['rotation_x'],
                                                              self.data_aug_params['rotation_y'],

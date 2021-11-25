@@ -367,7 +367,7 @@ class SegmentationNetwork(NeuralNetwork):
                 add_for_nb_of_preds = self._gaussian_3d
             else:
                 add_for_nb_of_preds = np.ones(data.shape[1:], dtype=np.float32)
-            aggregated_results = np.zeros([self.num_classes] + list(data.shape[1:]), dtype=np.float32)
+            aggregated_results = np.zeros([self.num_classes] + list(data.shape[1:]), dtype=np.float32)#(2, 23, 512, 512)
             aggregated_nb_of_predictions = np.zeros([self.num_classes] + list(data.shape[1:]), dtype=np.float32)
 
         for x in steps[0]:
@@ -403,14 +403,15 @@ class SegmentationNetwork(NeuralNetwork):
         class_probabilities = aggregated_results / aggregated_nb_of_predictions
 
         if regions_class_order is None:
-            predicted_segmentation = class_probabilities.argmax(0)
-        else:
+            # predicted_segmentation = class_probabilities.argmax(0)
+        # else:
             if all_in_gpu:
                 class_probabilities_here = class_probabilities.detach().cpu().numpy()
             else:
                 class_probabilities_here = class_probabilities
             predicted_segmentation = np.zeros(class_probabilities_here.shape[1:], dtype=np.float32)
-            for i, c in enumerate(regions_class_order):
+            # for i, c in enumerate(regions_class_order):
+            for i, c in enumerate([1,2]):
                 predicted_segmentation[class_probabilities_here[i] > 0.5] = c
 
         if all_in_gpu:

@@ -19,7 +19,7 @@ from nnunet.network_architecture.generic_modular_residual_UNet import FabiansUNe
 from nnunet.network_architecture.initialization import InitWeights_He
 from nnunet.training.network_training.nnUNetTrainer import nnUNetTrainer
 from nnunet.training.network_training.nnUNetTrainerV2 import nnUNetTrainerV2
-from nnunet.utilities.nd_softmax import softmax_helper
+from nnunet.utilities.nd_softmax import sigmoid_helper
 
 
 class nnUNetTrainerV2_ResencUNet(nnUNetTrainerV2):
@@ -42,7 +42,7 @@ class nnUNetTrainerV2_ResencUNet(nnUNetTrainerV2):
 
         if torch.cuda.is_available():
             self.network.cuda()
-        self.network.inference_apply_nonlin = softmax_helper
+        self.network.inference_apply_nonlin = sigmoid_helper
 
     def setup_DA_params(self):
         """

@@ -152,6 +152,7 @@ def main():
     trainer.initialize(not validation_only)
 
     if find_lr:
+
         trainer.find_lr()
     else:
         if not validation_only:

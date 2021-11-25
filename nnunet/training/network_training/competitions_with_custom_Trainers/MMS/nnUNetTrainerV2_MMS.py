@@ -3,7 +3,7 @@ from nnunet.network_architecture.generic_UNet import Generic_UNet
 from nnunet.network_architecture.initialization import InitWeights_He
 from nnunet.training.network_training.nnUNet_variants.data_augmentation.nnUNetTrainerV2_insaneDA import \
     nnUNetTrainerV2_insaneDA
-from nnunet.utilities.nd_softmax import softmax_helper
+from nnunet.utilities.nd_softmax import sigmoid_helper
 from torch import nn
 
 
@@ -51,7 +51,7 @@ class nnUNetTrainerV2_MMS(nnUNetTrainerV2_insaneDA):
                                     self.net_num_pool_op_kernel_sizes, self.net_conv_kernel_sizes, False, True, True)
         if torch.cuda.is_available():
             self.network.cuda()
-        self.network.inference_apply_nonlin = softmax_helper
+        self.network.inference_apply_nonlin = sigmoid_helper
 
     """def run_training(self):
         from batchviewer import view_batch

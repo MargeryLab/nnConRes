@@ -17,12 +17,14 @@ from _warnings import warn
 from typing import Tuple
 
 import matplotlib
+from nnunet.training.loss_functions.deep_supervision import MultipleOutputLoss2, DiceLoss4BraTS, BCELoss4BraTS, BCELossBoud
 from batchgenerators.utilities.file_and_folder_operations import *
 from nnunet.network_architecture.neural_network import SegmentationNetwork
 from sklearn.model_selection import KFold
 from torch import nn
 from torch.cuda.amp import GradScaler, autocast
 from torch.optim.lr_scheduler import _LRScheduler
+from nnunet.utilities.id2trainId import id2trainId
 
 matplotlib.use("agg")
 from time import time, sleep
@@ -647,7 +649,26 @@ class NetworkTrainer(object):
         else:
             output = self.network(data)
             del data
-            l = self.loss(output, target)
+            label = target[0]
+            label = id2trainId(label)
+            bs, _, dep, hei, wei = label.shape
+            label_copy = torch.zeros((bs, _, dep, hei, wei), dtype=torch.float32, device='cuda')
+            label_copy[:, :, 1:, :, :] = label[:, :, 0:dep - 1, :, :]
+            label_res = label - label_copy
+            label_res[torch.where(label_res == 0)] = 0
+            label_res[torch.where(label_res != 0)] = 1
+            # term_seg = self.loss(output, target)
+            loss_D = DiceLoss4BraTS().to('cuda')  # DiceLoss
+            loss_BCE = BCELoss4BraTS().to('cuda')  # BCE
+            loss_B = BCELossBoud().to('cuda')
+
+            term_seg_Dice = loss_D.forward(output[0], label)
+            term_seg_BCE = loss_BCE.forward(output[0], label)
+            term_res_BCE = loss_B.forward(output[1], label_res)
+            term_resx2_BCE = loss_B.forward(output[2], label_res)
+            term_resx4_BCE = loss_B.forward(output[3], label_res)
+
+            l = term_seg_Dice + term_seg_BCE + term_res_BCE + 0.5 * (term_resx2_BCE +term_resx4_BCE)
 
             if do_backprop:
                 l.backward()

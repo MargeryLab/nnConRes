@@ -24,7 +24,7 @@ from nnunet.network_architecture.initialization import InitWeights_He
 from nnunet.network_architecture.neural_network import SegmentationNetwork
 from nnunet.training.dataloading.dataset_loading import unpack_dataset
 from nnunet.training.network_training.nnUNetTrainer import nnUNetTrainer
-from nnunet.utilities.nd_softmax import softmax_helper
+from nnunet.utilities.nd_softmax import sigmoid_helper
 from torch import nn
 from torch.cuda.amp import autocast
 from torch.nn.parallel.data_parallel import DataParallel
@@ -147,7 +147,7 @@ class nnUNetTrainerV2_DP(nnUNetTrainerV2):
                                     self.net_num_pool_op_kernel_sizes, self.net_conv_kernel_sizes, False, True, True)
         if torch.cuda.is_available():
             self.network.cuda()
-        self.network.inference_apply_nonlin = softmax_helper
+        self.network.inference_apply_nonlin = sigmoid_helper
 
     def initialize_optimizer_and_scheduler(self):
         assert self.network is not None, "self.initialize_network must be called first"

@@ -699,3 +699,4 @@ class PreprocessorFor2D_noNormalization(GenericPreprocessor):
         assert len(self.use_nonzero_mask) == len(data), "self.use_nonzero_mask must have as many entries as data" \
                                                         " has modalities"
         return data, seg, properties
+

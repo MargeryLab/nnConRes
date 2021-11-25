@@ -18,7 +18,7 @@ from nnunet.network_architecture.generic_UNet import Generic_UNet
 from nnunet.network_architecture.initialization import InitWeights_He
 from nnunet.training.loss_functions.crossentropy import RobustCrossEntropyLoss
 from nnunet.training.loss_functions.dice_loss import get_tp_fp_fn_tn
-from nnunet.utilities.nd_softmax import softmax_helper
+from nnunet.utilities.nd_softmax import sigmoid_helper
 from nnunet.utilities.tensor_utilities import sum_tensor
 from torch import nn
 
@@ -71,14 +71,14 @@ class Generic_UNet_DP(Generic_UNet):
                 fps = []
                 fns = []
 
-                res_softmax = softmax_helper(res[0])
+                res_softmax = sigmoid_helper(res[0])
                 tp, fp, fn, _ = get_tp_fp_fn_tn(res_softmax, y[0])
                 tps.append(tp)
                 fps.append(fp)
                 fns.append(fn)
                 for i in range(1, len(y)):
                     ce_losses.append(self.ce_loss(res[i], y[i]).unsqueeze(0))
-                    res_softmax = softmax_helper(res[i])
+                    res_softmax = sigmoid_helper(res[i])
                     tp, fp, fn, _ = get_tp_fp_fn_tn(res_softmax, y[i])
                     tps.append(tp)
                     fps.append(fp)
@@ -88,7 +88,7 @@ class Generic_UNet_DP(Generic_UNet):
                 ce_loss = self.ce_loss(res, y).unsqueeze(0)
 
                 # tp fp and fn need the output to be softmax
-                res_softmax = softmax_helper(res)
+                res_softmax = sigmoid_helper(res)
 
                 tp, fp, fn, _ = get_tp_fp_fn_tn(res_softmax, y)
 
@@ -104,7 +104,7 @@ class Generic_UNet_DP(Generic_UNet):
 
                 with torch.no_grad():
                     num_classes = output.shape[1]
-                    output_softmax = softmax_helper(output)
+                    output_softmax = sigmoid_helper(output)
                     output_seg = output_softmax.argmax(1)
                     target = target[:, 0]
                     axes = tuple(range(1, len(target.shape)))

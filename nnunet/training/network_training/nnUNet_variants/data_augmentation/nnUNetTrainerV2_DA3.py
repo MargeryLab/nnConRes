@@ -23,7 +23,7 @@ from nnunet.training.data_augmentation.default_data_augmentation import default_
 from nnunet.training.dataloading.dataset_loading import unpack_dataset
 from nnunet.training.loss_functions.deep_supervision import MultipleOutputLoss2
 from nnunet.training.network_training.nnUNetTrainerV2 import nnUNetTrainerV2, maybe_mkdir_p
-from nnunet.utilities.nd_softmax import softmax_helper
+from nnunet.utilities.nd_softmax import sigmoid_helper
 from torch import nn
 
 
@@ -189,4 +189,4 @@ class nnUNetTrainerV2_DA3_BN(nnUNetTrainerV2_DA3):
                                     self.net_num_pool_op_kernel_sizes, self.net_conv_kernel_sizes, False, True, True)
         if torch.cuda.is_available():
             self.network.cuda()
-        self.network.inference_apply_nonlin = softmax_helper
+        self.network.inference_apply_nonlin = sigmoid_helper

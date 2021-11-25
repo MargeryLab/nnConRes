@@ -35,7 +35,7 @@ from nnunet.training.loss_functions.crossentropy import RobustCrossEntropyLoss
 from nnunet.training.loss_functions.dice_loss import get_tp_fp_fn_tn
 from nnunet.training.network_training.nnUNetTrainerV2 import nnUNetTrainerV2
 from nnunet.utilities.distributed import awesome_allgather_function
-from nnunet.utilities.nd_softmax import softmax_helper
+from nnunet.utilities.nd_softmax import sigmoid_helper
 from nnunet.utilities.tensor_utilities import sum_tensor
 from nnunet.utilities.to_torch import to_cuda, maybe_to_torch
 from torch import nn, distributed
@@ -251,7 +251,7 @@ class nnUNetTrainerV2_DDP(nnUNetTrainerV2):
             axes = tuple(range(2, len(output[i].size())))
 
             # network does not do softmax. We need to do softmax for dice
-            output_softmax = softmax_helper(output[i])
+            output_softmax = sigmoid_helper(output[i])
 
             # get the tp, fp and fn terms we need
             tp, fp, fn, _ = get_tp_fp_fn_tn(output_softmax, target[i], axes, mask=None)

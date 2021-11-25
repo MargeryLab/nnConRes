@@ -27,7 +27,7 @@ from batchgenerators.utilities.file_and_folder_operations import *
 from nnunet.configuration import default_num_threads
 from nnunet.evaluation.evaluator import aggregate_scores
 from nnunet.inference.segmentation_export import save_segmentation_nifti_from_softmax
-from nnunet.network_architecture.generic_UNet import Generic_UNet
+from nnunet.network_architecture.generic_ConResAtt import conresnet
 from nnunet.network_architecture.initialization import InitWeights_He
 from nnunet.network_architecture.neural_network import SegmentationNetwork
 from nnunet.postprocessing.connected_components import determine_postprocessing
@@ -36,10 +36,11 @@ from nnunet.training.data_augmentation.default_data_augmentation import default_
 from nnunet.training.dataloading.dataset_loading import load_dataset, DataLoader3D, DataLoader2D, unpack_dataset
 from nnunet.training.loss_functions.dice_loss import DC_and_CE_loss
 from nnunet.training.network_training.network_trainer import NetworkTrainer
-from nnunet.utilities.nd_softmax import softmax_helper
+from nnunet.utilities.nd_softmax import sigmoid_helper
 from nnunet.utilities.tensor_utilities import sum_tensor
 from torch import nn
 from torch.optim import lr_scheduler
+from nnunet.utilities.id2trainId import id2trainId
 
 
 matplotlib.use("agg")
@@ -254,12 +255,13 @@ class nnUNetTrainer(NetworkTrainer):
         dropout_op_kwargs = {'p': 0, 'inplace': True}
         net_nonlin = nn.LeakyReLU
         net_nonlin_kwargs = {'negative_slope': 1e-2, 'inplace': True}
-        self.network = Generic_UNet(self.num_input_channels, self.base_num_features, self.num_classes, net_numpool,
-                                    self.conv_per_stage, 2, conv_op, norm_op, norm_op_kwargs, dropout_op,
-                                    dropout_op_kwargs,
-                                    net_nonlin, net_nonlin_kwargs, False, False, lambda x: x, InitWeights_He(1e-2),
-                                    self.net_num_pool_op_kernel_sizes, self.net_conv_kernel_sizes, False, True, True)
-        self.network.inference_apply_nonlin = softmax_helper
+        # self.network = Generic_UNet(self.num_input_channels, self.base_num_features, self.num_classes, net_numpool,
+        #                             self.conv_per_stage, 2, conv_op, norm_op, norm_op_kwargs, dropout_op,
+        #                             dropout_op_kwargs,
+        #                             net_nonlin, net_nonlin_kwargs, False, False, lambda x: x, InitWeights_He(1e-2),
+        #                             self.net_num_pool_op_kernel_sizes, self.net_conv_kernel_sizes, False, True, True)
+        self.network = conresnet(self.basic_generator_patch_size, conv_op, norm_op, norm_op_kwargs, num_classes=self.num_classes)
+        self.network.inference_apply_nonlin = sigmoid_helper
 
         if torch.cuda.is_available():
             self.network.cuda()
@@ -362,7 +364,8 @@ class nnUNetTrainer(NetworkTrainer):
         self.normalization_schemes = plans['normalization_schemes']
         self.base_num_features = plans['base_num_features']
         self.num_input_channels = plans['num_modalities']
-        self.num_classes = plans['num_classes'] + 1  # background is no longer in num_classes
+        # self.num_classes = plans['num_classes'] + 1  # background is no longer in num_classes
+        self.num_classes = plans['num_classes']  # background is no longer in num_classes
         self.classes = plans['all_classes']
         self.use_mask_for_norm = plans['use_mask_for_norm']
         self.only_keep_largest_connected_component = plans['keep_only_largest_region']
@@ -638,7 +641,7 @@ class nnUNetTrainer(NetworkTrainer):
         self.print_to_log_file("evaluation of raw predictions")
         task = self.dataset_directory.split("/")[-1]
         job_name = self.experiment_name
-        _ = aggregate_scores(pred_gt_tuples, labels=list(range(self.num_classes)),
+        _ = aggregate_scores(pred_gt_tuples, labels=list(range(self.num_classes+1)),
                              json_output_file=join(output_folder, "summary.json"),
                              json_name=job_name + " val tiled %s" % (str(use_sliding_window)),
                              json_author="Fabian",
@@ -682,17 +685,25 @@ class nnUNetTrainer(NetworkTrainer):
     def run_online_evaluation(self, output, target):
         with torch.no_grad():
             num_classes = output.shape[1]
-            output_softmax = softmax_helper(output)
-            output_seg = output_softmax.argmax(1)
-            target = target[:, 0]
+            output_sig = sigmoid_helper(output)
+            # output_seg = output_sig.argmax(1)
+            output_sig = torch.round(output_sig).type(torch.uint8)
+            target = target[:, 0].type(torch.uint8)
+
+            seg_pred_TUMOR = output_sig[:,0,:,:,:]
+            seg_pred_RECTAL = output_sig[:,1,:,:,:]
+            output_seg = torch.zeros_like(seg_pred_TUMOR)
+            output_seg = torch.where(seg_pred_TUMOR == torch.tensor(1, dtype=seg_pred_TUMOR.dtype, device=seg_pred_TUMOR.device),torch.tensor(1, dtype=output_seg.dtype, device=output_seg.device), output_seg)
+            output_seg = torch.where(seg_pred_RECTAL == torch.tensor(1, dtype=seg_pred_RECTAL.dtype, device=seg_pred_TUMOR.device),torch.tensor(2, dtype=output_seg.dtype, device=output_seg.device), output_seg)
+
             axes = tuple(range(1, len(target.shape)))
-            tp_hard = torch.zeros((target.shape[0], num_classes - 1)).to(output_seg.device.index)
-            fp_hard = torch.zeros((target.shape[0], num_classes - 1)).to(output_seg.device.index)
-            fn_hard = torch.zeros((target.shape[0], num_classes - 1)).to(output_seg.device.index)
-            for c in range(1, num_classes):
-                tp_hard[:, c - 1] = sum_tensor((output_seg == c).float() * (target == c).float(), axes=axes)
-                fp_hard[:, c - 1] = sum_tensor((output_seg == c).float() * (target != c).float(), axes=axes)
-                fn_hard[:, c - 1] = sum_tensor((output_seg != c).float() * (target == c).float(), axes=axes)
+            tp_hard = torch.zeros((target.shape[0], num_classes)).to(output_seg.device.index)
+            fp_hard = torch.zeros((target.shape[0], num_classes)).to(output_seg.device.index)
+            fn_hard = torch.zeros((target.shape[0], num_classes)).to(output_seg.device.index)
+            for c in range(1, num_classes+1):
+                tp_hard[:, c-1] = sum_tensor((output_seg == c).float() * (target == c).float(), axes=axes)
+                fp_hard[:, c-1] = sum_tensor((output_seg == c).float() * (target != c).float(), axes=axes)
+                fn_hard[:, c-1] = sum_tensor((output_seg != c).float() * (target == c).float(), axes=axes)
 
             tp_hard = tp_hard.sum(0, keepdim=False).detach().cpu().numpy()
             fp_hard = fp_hard.sum(0, keepdim=False).detach().cpu().numpy()

@@ -112,10 +112,11 @@ def save_segmentation_nifti_from_softmax(segmentation_softmax: Union[str, np.nda
         save_pickle(properties_dict, resampled_npz_fname[:-4] + ".pkl")
 
     if region_class_order is None:
-        seg_old_spacing = seg_old_spacing.argmax(0)
-    else:
+        # seg_old_spacing = seg_old_spacing.argmax(0)
+    # else:
         seg_old_spacing_final = np.zeros(seg_old_spacing.shape[1:])
-        for i, c in enumerate(region_class_order):
+        # for i, c in enumerate(region_class_order):
+        for i, c in enumerate([1,2]):
             seg_old_spacing_final[seg_old_spacing[i] > 0.5] = c
         seg_old_spacing = seg_old_spacing_final
 

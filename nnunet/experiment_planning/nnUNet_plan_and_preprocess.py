@@ -31,7 +31,7 @@ def main():
     parser.add_argument("-t", "--task_ids", nargs="+", help="List of integers belonging to the task ids you wish to run"
                                                             " experiment planning and preprocessing for. Each of these "
                                                             "ids must, have a matching folder 'TaskXXX_' in the raw "
-                                                            "data folder")
+                                                            "data folder", default='3')
     parser.add_argument("-pl3d", "--planner3d", type=str, default="ExperimentPlanner3D_v21",
                         help="Name of the ExperimentPlanner class for the full resolution 3D U-Net and U-Net cascade. "
                              "Default is ExperimentPlanner3D_v21. Can be 'None', in which case these U-Nets will not be "

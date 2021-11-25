@@ -259,7 +259,7 @@ class ExperimentPlanner(object):
 
         max_spacing_axis = np.argmax(target_spacing)
         remaining_axes = [i for i in list(range(3)) if i != max_spacing_axis]
-        self.transpose_forward = [max_spacing_axis] + remaining_axes
+        self.transpose_forward = [max_spacing_axis] + remaining_axes#list [0, 1, 2]
         self.transpose_backward = [np.argwhere(np.array(self.transpose_forward) == i)[0][0] for i in range(3)]
 
         # we base our calculations on the median shape of the datasets

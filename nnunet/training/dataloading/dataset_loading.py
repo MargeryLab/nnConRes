@@ -183,20 +183,20 @@ class DataLoader3D(SlimDataLoaderBase):
         if pad_kwargs_data is None:
             pad_kwargs_data = OrderedDict()
         self.pad_kwargs_data = pad_kwargs_data
-        self.pad_mode = pad_mode
-        self.oversample_foreground_percent = oversample_foreground_percent
-        self.final_patch_size = final_patch_size
-        self.has_prev_stage = has_prev_stage
-        self.patch_size = patch_size
+        self.pad_mode = pad_mode#'constant'
+        self.oversample_foreground_percent = oversample_foreground_percent#0.33
+        self.final_patch_size = final_patch_size#[ 16 320 320]
+        self.has_prev_stage = has_prev_stage#False
+        self.patch_size = patch_size#[ 16 376 376]
         self.list_of_keys = list(self._data.keys())
         # need_to_pad denotes by how much we need to pad the data so that if we sample a patch of size final_patch_size
         # (which is what the network will get) these patches will also cover the border of the patients
-        self.need_to_pad = (np.array(patch_size) - np.array(final_patch_size)).astype(int)
+        self.need_to_pad = (np.array(patch_size) - np.array(final_patch_size)).astype(int)#[ 0 56 56]
         if pad_sides is not None:
             if not isinstance(pad_sides, np.ndarray):
                 pad_sides = np.array(pad_sides)
             self.need_to_pad += pad_sides
-        self.memmap_mode = memmap_mode
+        self.memmap_mode = memmap_mode#'r'
         self.num_channels = None
         self.pad_sides = pad_sides
         self.data_shape, self.seg_shape = self.determine_shapes()
@@ -210,13 +210,13 @@ class DataLoader3D(SlimDataLoaderBase):
         else:
             num_seg = 1
 
-        k = list(self._data.keys())[0]
+        k = list(self._data.keys())[0]#1000022
         if isfile(self._data[k]['data_file'][:-4] + ".npy"):
             case_all_data = np.load(self._data[k]['data_file'][:-4] + ".npy", self.memmap_mode)
         else:
             case_all_data = np.load(self._data[k]['data_file'])['data']
-        num_color_channels = case_all_data.shape[0] - 1
-        data_shape = (self.batch_size, num_color_channels, *self.patch_size)
+        num_color_channels = case_all_data.shape[0] - 1#1
+        data_shape = (self.batch_size, num_color_channels, *self.patch_size)#(2, 1, 16, 376, 376)
         seg_shape = (self.batch_size, num_seg, *self.patch_size)
         return data_shape, seg_shape
 
